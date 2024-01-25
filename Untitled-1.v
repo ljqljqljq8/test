@@ -1,132 +1,211 @@
-`timescale 1 ns / 1 ps
-module maxis_v1_0_M00_AXIS #
-(
-// Width of S_AXIS address bus. The slave accepts the read and write addresses of width C_M_AXIS_TDATA_WIDTH.
-parameter integer C_M_AXIS_TDATA_WIDTH = 32,
-// Start count is the number of clock cycles the master will wait before initiating/issuing any transaction.
-parameter integer C_M_START_COUNT = 32
-)
-(// Global ports
-input wire M_AXIS_ACLK,
-//
-input wire M_AXIS_ARESETN,
-// Master Stream Ports. TVALID indicates that the master is driving a valid transfer, A transfer takes place when both TVALID
-and TREADY are asserted.
-output wire M_AXIS_TVALID,
-// TDATA is the primary payload that is used to provide the data that is passing across the interface from the master.
-output wire [C_M_AXIS_TDATA_WIDTH-1 : 0] M_AXIS_TDATA,
-// TSTRB is the byte qualifier that indicates whether the content of the associated byte of TDATA is processed as a data
-byte or a position byte.
-output wire [(C_M_AXIS_TDATA_WIDTH/8)-1 : 0] M_AXIS_TSTRB,
-// TLAST indicates the boundary of a packet.
-output wire M_AXIS_TLAST,
-// TREADY indicates that the slave can accept a transfer in the current cycle.
-input wire M_AXIS_TREADY
+`timescale 1ns / 1ps
+//////////////////////////////////////////////////////////////////////////////////
+// Company: 
+// Engineer: LJQ
+// 
+// Create Date: 2024/01/24 13:49:19
+// Design Name: 
+// Module Name: axi_stream_insert_header
+// Project Name: 
+// Target Devices: 
+// Tool Versions: 
+// Description: 将输入的header头部去除无效字节，与有效数据进行拼接重组后按照AXI STREAM输出
+// Dependencies: 
+// 
+// Revision:
+// Revision 0.01 - File Created
+// Additional Comments:
+// 
+//////////////////////////////////////////////////////////////////////////////////
+
+`timescale 1ns/1ns
+
+module axi_stream_insert_header #(
+    parameter                      DATA_WD = 32,
+    parameter                      DATA_BYTE_WD = DATA_WD / 8,
+    parameter                      BYTE_CNT_WD = $clog2(DATA_BYTE_WD)
+	) (
+	input 				            clk 	,//时钟信号   
+	input 				            rst_n	,//复位信号
+
+    // AXI Stream input original data
+    input                           valid_in,
+    input  [DATA_WD-1 : 0]          data_in,
+    input  [DATA_BYTE_WD-1 : 0]     keep_in,
+    input                           last_in,
+    output                          ready_in,
+    // AXI Stream output with header inserted
+    output                          valid_out,
+    output   [DATA_WD-1 : 0]        data_out,
+    output reg [DATA_BYTE_WD-1 : 0] keep_out,
+    output reg                      last_out,
+    input                           ready_out,
+    // The header to be inserted to AXI Stream input
+    input                           valid_insert,
+    input [DATA_WD-1 : 0]           data_insert,
+    input [DATA_BYTE_WD-1 : 0]      keep_insert,
+    input [BYTE_CNT_WD-1 : 0]       byte_insert_cnt,
+    output  reg                     ready_insert 
 );
-// Total number of output data
-localparam NUMBER_OF_OUTPUT_WORDS = 8;
-// function called clogb2 that returns an integer which has the
-// value of the ceiling of the log base 2.
-function integer clogb2 (input integer bit_depth);
-begin
-for(clogb2=0; bit_depth>0; clogb2=clogb2+1)
-bit_depth = bit_depth >> 1;
-end
-endfunction
-// WAIT_COUNT_BITS is the width of the wait counter.
-localparam integer WAIT_COUNT_BITS = clogb2(C_M_START_COUNT-1);
-// bit_num gives the minimum number of bits needed to address 'depth' size of FIFO.
-localparam bit_num = clogb2(NUMBER_OF_OUTPUT_WORDS);
-// Define the states of state machine
-// The control state machine oversees the writing of input streaming data to the FIFO,
-// and outputs the streaming data from the FIFO
-parameter [1:0] IDLE = 2'b00, // This is the initial/idle state
-INIT_COUNTER = 2'b01, // This state initializes the counter, once
-// the counter reaches C_M_START_COUNT count,
-// the state machine changes state to SEND_STREAM
-SEND_STREAM = 2'b10; // In this state the
-// stream data is output through M_AXIS_TDATA
-// State variable
-reg [1:0] mst_exec_state;
-// Example design FIFO read pointer
-reg [bit_num-1:0] read_pointer;
-// AXI Stream internal signals
-//wait counter. The master waits for the user defined number of clock cycles before initiating a transfer.
-reg [WAIT_COUNT_BITS-1 : 0] count;
-//streaming data valid
-wire axis_tvalid;
-//Last of the streaming data
-wire axis_tlast;
-wire tx_en;
-//The master has issued all the streaming data stored in FIFO
-wire tx_done;
-// I/O Connections assignments
-assign M_AXIS_TVALID = axis_tvalid;
-assign M_AXIS_TDATA = read_pointer;
-assign M_AXIS_TLAST = axis_tlast;
-assign M_AXIS_TSTRB = {(C_M_AXIS_TDATA_WIDTH/8){1'b1}};
-// Control state machine implementation
-always @(posedge M_AXIS_ACLK)
-begin
-if (!M_AXIS_ARESETN)
-// Synchronous reset (active low)
-begin
-mst_exec_state <= IDLE;
-count <= 0;
-end
-else
-case (mst_exec_state)
-IDLE:
-mst_exec_state <=
-INIT_COUNTER;
-INIT_COUNTER:
-// The slave starts accepting tdata when
-// there tvalid is asserted to mark the
-// presence of valid streaming data
-if ( count == C_M_START_COUNT - 1 )
-begin
-mst_exec_state <= SEND_STREAM;
-end
-else
-begin
-count <= count + 1;
-mst_exec_state <= INIT_COUNTER;
-end
-SEND_STREAM:
-// The example design streaming master functionality starts
-// when the master drives output tdata from the FIFO and the slave
-// has finished storing the S_AXIS_TDATA
-if (tx_done)
-begin
-mst_exec_state <= IDLE;
-end
-else
-begin
-mst_exec_state <= SEND_STREAM;
-end
-endcase
-end
-//tvalid generation
-//axis_tvalid is asserted when the control state machine's state is SEND_STREAM and
-//number of output streaming data is less than the NUMBER_OF_OUTPUT_WORDS.
-assign axis_tvalid = ((mst_exec_state == SEND_STREAM) && (read_pointer < NUMBER_OF_OUTPUT_WORDS));
-// AXI tlast
-generation
-assign axis_tlast = (read_pointer == NUMBER_OF_OUTPUT_WORDS - 1'b1)&&
-tx_en;
-assign tx_done = axis_tlast;
-//FIFO read enable generation
-assign tx_en = M_AXIS_TREADY && axis_tvalid;
-// Streaming output data is read from FIFO
-always @( posedge M_AXIS_ACLK )
-begin
-if(!M_AXIS_ARESETN)
-begin
-read_pointer <= 0;
-end
-else if (tx_en)
-begin
-read_pointer <= read_pointer + 32'b1;
-end
-end
+
+          // signals 
+         reg                  buf_valid; // 指示缓存有数据
+         reg  [DATA_WD-1:0]   buf_data;  // 用于数据暂存
+
+         wire [DATA_WD-1:0]   concatenated_data;  // 用于数据重组
+         
+         reg [DATA_WD-1:0]   data_reg_last = 0;
+         reg [DATA_WD-1:0]   data_reg = 0;
+         reg last_out_store = 0;
+         reg [DATA_BYTE_WD-1 : 0] keep_out_store = 0;
+         reg start_en;
+         reg start_data;
+         wire [BYTE_CNT_WD-1 : 0] ones_count_temp;
+         reg first = 0;
+         integer byte_index_i,byte_index_j;
+         
+         wire [BYTE_CNT_WD : 0]   byte_cnt; // 表示keep_insert 1的个数，e.g. keep_insert（1110）--> byte_cnt(2)
+        
+         always @ (posedge clk or negedge rst_n) begin
+             if(!rst_n) begin
+                 ready_insert <= 1;//有个buf因此复位后至少可以收一个数据
+                 start_en <= 0;
+             end
+             else if(!start_en)
+                 ready_insert <= 1;
+             else if(valid_insert) // 已经传来过了一个header数据
+                 ready_insert <= 0; 
+         end
+        
+        initial  buf_valid = 0;
+		always @(posedge clk)
+		if (!rst_n)
+			buf_valid <= 0;
+		else if ((valid_in && ready_in) && (valid_out && !ready_out) && start_en)
+			buf_valid <= 1;
+		else if (ready_out)
+			buf_valid <= 0;
+        
+
+         
+         always @ (posedge clk or negedge rst_n ) begin
+             if(!rst_n) //可能有些控制信号通过本模块的data端口进行传输，因此有必要进行复位。
+                begin
+                     buf_data <= 0;
+                end
+             else if(!ready_out && (valid_in && ready_in)) // 当接收握手并且可以暂存时，更新buffer
+                 buf_data <=  start_en ? data_in : 0;
+         end
+         
+         // 用于数据表示和交互
+         wire [DATA_WD-1:0]   data_temp;
+         wire [DATA_WD-1:0]   data_temp_last;
+         reg [DATA_WD-1:0]    data_temp_store;
+         
+         always @ (posedge clk or negedge rst_n) begin
+         if(!rst_n) begin
+                data_temp_store <= 0;
+         end
+         else begin
+                data_temp_store <= data_temp ;
+             end
+         end
+         
+         assign     concatenated_data = ((data_temp_last & ((1 << (8 * (byte_cnt))) - 1)) << (DATA_WD-8 * (byte_cnt))) | 
+                                        (data_temp & ((1 << (8 * (DATA_BYTE_WD-byte_cnt))) - 1) << (8 * (byte_cnt)));  // 位拼接逻辑
+
+         // 只有在接收到header后才有效
+         assign ready_in = (start_en) ? (last_out ? 0 : !buf_valid) : 0;
+         assign	valid_out  =   start_en ? (rst_n && (valid_in || buf_valid)): 0;
+         
+         assign data_temp  =  start_en ? (last_out_store ? data_reg_last : ((first ? ((ready_out &&valid_out)? (buf_valid ? buf_data : data_in ) : data_temp): data_reg ))) : 0;
+         assign data_temp_last = start_en ? ((ready_out && valid_out) ? data_temp_store : data_temp_last): 0;
+         // 判断逻辑 ：         接收到header表示准备数据的传输start_en有效，否则data_temp为0-->
+         // 若接收到的不是最后一拍数据，则进行第一拍数据的判断,否则data_temp为最后一拍数据-->
+         // 如果已经接收到了第一拍数据，则进行buffer判断，查看数据是否在buffer中，否则data_temp为header数据
+         // 由于数据需要重组拼接，需要在输出方未握手下保留前一拍数据，故进行握手判断
+         assign data_out   = concatenated_data ; 
+         assign ones_count_temp = count_one(keep_out_store);// 计算1的位数，通过线网连接即时更新
+
+        always @ (posedge clk or negedge rst_n) begin
+             if(!rst_n) begin
+                     last_out <= 0;
+                     keep_out <= 4'b1111;
+             end
+             else begin
+                     if(last_out_store && (ready_out && valid_out)) begin
+                        if((keep_out_store + byte_cnt) < keep_out_store)begin  // 若满足此条件，说明最后一个数据的keep_in和插入header的keep_insert的1bit的总和大于DATA_BYTE_WD，总发送data数比发送方的data_in多1
+                            last_out <= 1;
+                            keep_out <= ((1 << (ones_count_temp + byte_cnt - DATA_BYTE_WD))-1) << (DATA_BYTE_WD-(ones_count_temp + byte_cnt - DATA_BYTE_WD));
+                            first <= 0;
+                        end
+                        else begin
+                            last_out <= 1;
+                            keep_out <= ((1 << (ones_count_temp + byte_cnt))-1) << (DATA_BYTE_WD-(ones_count_temp + byte_cnt));
+                            first <= 0;
+                        end
+
+                         if(last_out && (ready_out && valid_out)) begin
+                            last_out <= 0;
+                            last_out_store <= 0;
+                            start_en <= 0;
+                         end         
+                     end
+             end
+         end
+        
+        
+         always @(posedge last_in or negedge rst_n) begin
+                if(!rst_n) begin
+                     data_reg_last <= 0; // 寄存最后一个数据
+                end
+                if(last_in && start_en) begin    // 接收到最后一个数据        
+                        for (byte_index_i = 0; byte_index_i < DATA_BYTE_WD; byte_index_i = byte_index_i + 1) begin
+                            data_reg_last[((byte_index_i) * 8 + 7) -: 8] <= (keep_in[byte_index_i] == 1) ? data_temp[(byte_index_i * 8 + 7) -: 8] : 8'b0;
+                        end
+                            last_out_store <= 1;
+                            keep_out_store <= keep_in;          
+                end
+           end
+           
+          assign byte_cnt =  byte_insert_cnt + 1;
+          
+         always @(posedge clk or negedge rst_n) begin
+            if(!rst_n) begin
+                data_reg   <=   0;
+                start_en   <=   1'b0;
+             end
+            if(!start_en && (valid_insert && ready_insert))begin // 还未开始传header并且插入握手成功
+                data_reg   <=   data_insert;
+                start_en   <=   1'b1;
+            end
+
+         end
+         
+          always @(*) begin
+            if(!rst_n) begin
+                first <= 0;
+                start_data <= 0;
+             end
+            if(!first && (valid_in && ready_in))begin // 第一次得到数据
+                first <= 1;              
+            end
+            if(first && (valid_out && ready_out))begin
+                start_data <= 1;
+            end
+         end
+
+          // 1-bit 计算模块
+          function [BYTE_CNT_WD-1:0] count_one;
+                input[DATA_BYTE_WD-1:0] binary_number;
+              
+                reg [BYTE_CNT_WD-1:0] CNT ;
+                begin
+                 for ( CNT = 0; binary_number ; CNT = CNT + 1) begin
+                      binary_number = binary_number & (binary_number-1);
+                 end
+                 count_one = CNT;
+                end
+            endfunction
+    
 endmodule
