@@ -1,6 +1,7 @@
 ## 第一拍
 
-![Untitled]([https://prod-files-secure.s3.us-west-2.amazonaws.com/e986544c-e205-431e-a304-1609de685016/f4e4338a-ec85-421b-9040-3ab8c8c98b38/Untitled.png](https://www.notion.so/coolljq/8350a9c2ee5e404bac571b19e870063e?pvs=4#f1189f0c892740b69087019eb7756816))
+![image](https://github.com/ljqljqljq8/test/assets/118333395/22611a66-97ed-45c8-a942-efa0d31870b4)
+
 
 根据输入的header的有效位数为2，即0111，后三个字节有效，根据数据拼接
 
