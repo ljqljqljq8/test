@@ -1,6 +1,6 @@
 # 第一拍
 
-![Untitled](https://prod-files-secure.s3.us-west-2.amazonaws.com/e986544c-e205-431e-a304-1609de685016/f4e4338a-ec85-421b-9040-3ab8c8c98b38/Untitled.png)
+![image](https://github.com/ljqljqljq8/test/assets/118333395/446bc026-8931-45b6-8adf-22e1f467ae44)
 
 根据输入的header的有效位数为2，即0111，后三个字节有效，根据数据拼接，去除无效字节
 
@@ -16,7 +16,7 @@ header数据为00000038，发方data_in数据从00001fe0开始递增
 
 # 最后一拍
 
-![Untitled](https://prod-files-secure.s3.us-west-2.amazonaws.com/e986544c-e205-431e-a304-1609de685016/49ad2a38-95bb-452d-a0ed-53b4320cb329/Untitled.png)
+![image](https://github.com/ljqljqljq8/test/assets/118333395/3ffd6675-49ef-4137-8abf-b30d899a9971)
 
 发送方的最后一个数据为`0000202d`，其到来时last_in有效，并且keep_in为1110，即前三个字节为有效数据，根据逻辑，最后一个输出数据应该是00200000(最后四个零为无效数据)
 
@@ -34,7 +34,7 @@ header数据为00000038，发方data_in数据从00001fe0开始递增
 
 # 无数据丢失 & 重复
 
-![Untitled](https://prod-files-secure.s3.us-west-2.amazonaws.com/e986544c-e205-431e-a304-1609de685016/12b405ca-9cbf-4fe0-b0fa-eb49c1e3d0d5/Untitled.png)
+![image](https://github.com/ljqljqljq8/test/assets/118333395/a6c30171-7b5c-4bab-921f-64539cedb3da)
 
 根据仿真结果：
 
