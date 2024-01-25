@@ -26,7 +26,7 @@ header数据为00000038，发方data_in数据从00001fe0开始递增
 
 # 无气泡传输 & 逐级反压
 
-![Untitled](https://prod-files-secure.s3.us-west-2.amazonaws.com/e986544c-e205-431e-a304-1609de685016/66f004d8-f250-483c-bcca-e900f147d0ec/Untitled.png)
+![image](https://github.com/ljqljqljq8/test/assets/118333395/e73efaf3-fb8c-477f-9a4a-c405ce6c42fd)
 
 图示时刻接收方拉低ready_out,发送方仍然能够接收数据，并在后续有效被接收方读取
 
