@@ -123,6 +123,7 @@ Data is: 00202b00
 Data is: 00202c00
 Data is: 00200000【最后一个数据，后两个字节无效】
 ```
+```markdown
 当使用DATA_WD=16，byte_insert_cnt=1(两个字节均有效)，最后一个数据的keep_in=2'b10(第一位有效)
 接收数据为：
 Data is: 0038【第一个数据，header为0038】
@@ -204,3 +205,6 @@ Data is: 202a
 Data is: 202b
 Data is: 202c
 Data is: 2000【最后一个数据，第二个字节无效】
+
+```
+
